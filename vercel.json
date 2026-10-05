@@ -1,5 +1,9 @@
 {
   "cleanUrls": true,
+  "rewrites": [
+    { "source": "/export-visits", "destination": "/api/export-visits" },
+    { "source": "/export-pdf", "destination": "/api/export-pdf" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

@@ -30,4 +30,4 @@ Calendarul este pregătit pentru săptămâna 5–11 octombrie 2026. Toate perso
 
 ## Vercel
 
-Proiectul poate fi importat direct în Vercel ca proiect static, cu presetul `Other`. Nu este necesară comandă de build sau director de ieșire. Funcțiile de calendar, pacienți, tarife, devize și fișe rulează în browser și datele demo sunt persistate local în browserul fiecărui utilizator.
+Proiectul poate fi importat direct în Vercel cu presetul `Other`. Nu este necesară comandă de build sau director de ieșire. Calendarul, pacienții, tarifele, devizele și fișele rulează în browser și datele demo sunt persistate local în browserul fiecărui utilizator. Endpoint-urile Vercel pentru XLSX și PDF sunt incluse în `api/` și au dependențele declarate în `requirements.txt`.
