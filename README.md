@@ -26,4 +26,8 @@ Pentru revenire la datele demo, ștergeți stocarea locală a site-ului din brow
 
 ## Date demonstrative
 
-Calendarul este pregătit pentru săptămâna 5–11 octombrie 2026. Fișa Elenei Munteanu este intenționat blocată: deschideți-o din Cartea medicală și urmați „Adaugă semnătura” pentru a testa întregul flux al documentelor.
+Calendarul este pregătit pentru săptămâna 5–11 octombrie 2026. Toate persoanele, telefoanele, adresele și adresele de email sunt date fictive de demonstrație. Fișa Sofiei Test este intenționat blocată: deschideți-o din Cartea medicală și urmați „Adaugă semnătura” pentru a testa întregul flux al documentelor.
+
+## Vercel
+
+Proiectul poate fi importat direct în Vercel ca proiect static, cu presetul `Other`. Nu este necesară comandă de build sau director de ieșire. Funcțiile de calendar, pacienți, tarife, devize și fișe rulează în browser și datele demo sunt persistate local în browserul fiecărui utilizator.
