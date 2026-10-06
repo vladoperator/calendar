@@ -191,6 +191,30 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
     toast('Te-ai deconectat. Datele locale nu au fost șterse.');
   };
 
+  window.changePassword = function (invitation = false) {
+    modal(`<h2>${invitation ? 'Alege parola administratorului' : 'Schimbă parola'}</h2><p class="muted">Parola trebuie să aibă minimum 8 caractere.</p><label>Parolă nouă<input id="newPwd" class="field" type="password" autocomplete="new-password" minlength="8"></label><label>Confirmă parola<input id="confirmPwd" class="field" type="password" autocomplete="new-password" minlength="8"></label><div class="footer-actions">${invitation ? '' : '<button class="soft" onclick="closeModal()">Anulează</button>'}<button class="black" onclick="finishPasswordChange()">Salvează parola</button></div>`);
+  };
+
+  window.finishPasswordChange = async function () {
+    const password = q('newPwd').value;
+    if (password.length < 8) {
+      toast('Parola trebuie să conțină minimum 8 caractere.');
+      return;
+    }
+    if (password !== q('confirmPwd').value) {
+      toast('Parolele introduse nu coincid.');
+      return;
+    }
+    try {
+      await cloud.updatePassword(password);
+      closeModal();
+      toast('Parola a fost salvată. Contul este gata.');
+    } catch (error) {
+      console.error('Schimbare parolă Supabase:', error);
+      toast('Parola nu a putut fi salvată. Deschide din nou linkul invitației.');
+    }
+  };
+
   resetDb = async function () {
     if (!confirm('Sigur resetați toate datele acestei clinici la starea demonstrativă?')) return;
     db = JSON.parse(JSON.stringify(seed));
@@ -204,6 +228,7 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
     const restored = await cloud.restoreSession();
     if (restored) {
       await loadFromSupabase();
+      if (cloud.authEvent === 'invite' || cloud.authEvent === 'recovery') changePassword(true);
     } else {
       updateDbBadge('offline', 'Autentificare necesară');
     }

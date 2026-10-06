@@ -4,6 +4,7 @@
   const storageKey = 'dentaAtelierSupabaseSession';
   let session = null;
   let stateRowId = null;
+  let authEvent = null;
 
   function configured() {
     return /^https:\/\//.test(config.url || '') && Boolean(config.publishableKey);
@@ -29,7 +30,19 @@
 
   async function restoreSession() {
     try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const hashToken = hash.get('access_token');
+      if (hashToken) {
+        authEvent = hash.get('type') || 'signin';
+        remember({
+          access_token: hashToken,
+          refresh_token: hash.get('refresh_token'),
+          expires_in: Number(hash.get('expires_in') || 0),
+          token_type: hash.get('token_type') || 'bearer'
+        });
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      }
+      const saved = session || JSON.parse(localStorage.getItem(storageKey) || 'null');
       if (!saved?.access_token) return null;
       session = saved;
       const user = await request('/auth/v1/user', {}, true);
@@ -74,6 +87,18 @@
     session = null;
     stateRowId = null;
     localStorage.removeItem(storageKey);
+  }
+
+  async function updatePassword(password) {
+    const user = await request('/auth/v1/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    }, true);
+    session.user = user;
+    localStorage.setItem(storageKey, JSON.stringify(session));
+    authEvent = null;
+    return user;
   }
 
   async function getProfile() {
@@ -123,7 +148,8 @@
   }
 
   window.dentaSupabase = {
-    configured, restoreSession, signIn, signUp, signOut, getProfile, listUsers, approveUser, loadState, saveState,
-    get session() { return session; }
+    configured, restoreSession, signIn, signUp, signOut, updatePassword, getProfile, listUsers, approveUser, loadState, saveState,
+    get session() { return session; },
+    get authEvent() { return authEvent; }
   };
 })();
