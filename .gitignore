@@ -1,0 +1,21 @@
+# Python & OS
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+
+# Local Clinic Database (Patient data should not be committed to public git)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Local Supabase overrides. The publishable browser key is not a secret, but
+# keep private service_role keys and personal deployment values out of Git.
+.env
+.env.local
