@@ -69,13 +69,13 @@ Pentru o bază de date **PostgreSQL** online, ai următoarele opțiuni excelente
 
 Această versiune folosește direct API-ul Supabase din browser, cu autentificare pe email și politici RLS. Nu este nevoie de `DATABASE_URL` sau de cheia `service_role`.
 
-1. Rulează, în ordine, migrarea [`001_clinic_state.sql`](supabase/migrations/001_clinic_state.sql) și [`002_team_access.sql`](supabase/migrations/002_team_access.sql) în SQL Editor-ul Supabase.
+1. Rulează, în ordine, migrarea [`001_clinic_state.sql`](supabase/migrations/001_clinic_state.sql), [`002_team_access.sql`](supabase/migrations/002_team_access.sql) și [`003_single_admin_access.sql`](supabase/migrations/003_single_admin_access.sql) în SQL Editor-ul Supabase.
 2. În **Authentication → URL Configuration**, adaugă URL-ul final Vercel la **Site URL** și **Redirect URLs**.
 3. În **Authentication → Users**, folosește **Add user** pentru a crea administratorul cu emailul și parola dorite. Primul cont devine automat administrator.
 4. Publică folderul curent pe Vercel. Fișierele `supabase-config.js` și `supabase-client.js` sunt servite automat împreună cu site-ul.
-5. Fiecare cont nou rămâne neaprobat până când administratorul îl aprobă din **Gestionează conturi**.
+5. Această configurare este pentru un singur administrator: pagina de autentificare apare înainte de calendar, nu există opțiune de creare cont în site, iar utilizatorii care nu sunt administratori nu pot citi sau modifica datele.
 
-Tabelul `clinic_state` păstrează starea completă a clinicii într-un document JSON comun. Politicile Row Level Security permit accesul numai membrilor aprobați; numai administratorul aprobă conturi noi.
+Tabelul `clinic_state` păstrează starea completă a clinicii într-un document JSON comun. Politicile Row Level Security permit accesul numai contului administratorului.
 
 ---
 

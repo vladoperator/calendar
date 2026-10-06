@@ -51,9 +51,9 @@ Pentru detalii complete despre găzduirea gratuită sau cloud (Render, Railway, 
 Aplicația este configurată pentru proiectul Supabase primit. Pentru a activa salvarea reală în cloud:
 
 1. În Supabase, deschide **SQL Editor** → **New query**.
-2. Rulează pe rând `supabase/migrations/001_clinic_state.sql` și `supabase/migrations/002_team_access.sql`.
+2. Rulează pe rând `supabase/migrations/001_clinic_state.sql`, `supabase/migrations/002_team_access.sql` și `supabase/migrations/003_single_admin_access.sql`.
 3. În **Authentication → Providers → Email**, activează Email. Pentru testare rapidă poți dezactiva temporar „Confirm email”; pentru producție las-o activă și setează un URL de redirect al site-ului tău.
 4. Creează primul utilizator din **Authentication → Users → Add user** în Supabase, cu emailul și parola administratorului alese de tine. Acesta devine automat administratorul clinicii.
-5. Orice persoană nouă își poate crea cont din site, dar rămâne în așteptare. Administratorul intră în site → indicatorul bazei de date → **Gestionează conturi** → **Aprobă**.
+5. Site-ul este intenționat cu acces pentru un singur administrator: calendarul rămâne ascuns până la autentificare, nu există creare de cont din interfață, iar politicile Supabase permit numai administratorului să citească sau să modifice datele.
 
-Membrii aprobați accesează aceeași clinică; conturile neaprobate nu pot citi sau modifica datele. Cheia din `supabase-config.js` este o cheie **publishable** destinată browserului; nu adăuga niciodată cheia `service_role` în proiect sau în Vercel.
+Cheia din `supabase-config.js` este o cheie **publishable** destinată browserului; nu adăuga niciodată cheia `service_role` în proiect sau în Vercel.
