@@ -372,8 +372,33 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
   })();
 })();
 </script>
+<script>
+(function () {
+  const calendar = document.querySelector('#calendar .calendar');
+  function clearHourHover() {
+    calendar.querySelectorAll('.hour-hover').forEach(el => el.classList.remove('hour-hover'));
+  }
+  calendar.addEventListener('pointermove', function (event) {
+    const grid = q('timegrid');
+    if (!grid || !grid.contains(event.target) || event.pointerType === 'touch') { clearHourHover(); return; }
+    const rect = grid.getBoundingClientRect();
+    const hour = Math.floor((event.clientY - rect.top + grid.scrollTop) / 30);
+    clearHourHover();
+    if (hour < 0 || hour > 23) return;
+    const label = grid.querySelectorAll('.time')[hour];
+    if (label) label.classList.add('hour-hover');
+    grid.querySelectorAll('.slot').forEach(slot => {
+      slot.style.setProperty('--hover-hour-top', hour * 30 + 'px');
+      slot.classList.add('hour-hover');
+    });
+  });
+  calendar.addEventListener('pointerleave', clearHourHover);
+})();
+</script>
 <style>
 /* Grilă lizibilă, păstrând aspectul de sticlă al interfeței. */
+.slot:hover,.slot.work:hover{background-color:#f8fbfd!important}.slot:not(.work):hover{background-color:#e5edf3!important}
+.slot.hour-hover::after{content:"";position:absolute;left:0;right:0;top:var(--hover-hour-top);height:30px;background:rgba(73,145,207,.18);border-top:1px solid #5995c4;border-bottom:1px solid #5995c4;pointer-events:none;z-index:1}.time.hour-hover{background:#c4def3;color:#173f60;box-shadow:inset 3px 0 #3177b4}
 .top{height:auto;min-height:66px;flex-wrap:wrap;padding:12px 14px}.top>*{flex-shrink:0}.nav{min-width:0}.toolbar{flex-wrap:wrap}.toolbar h1{min-width:180px}.mode{display:flex;gap:4px}.mode button.active{color:#fff!important}
 .calendar-layout{grid-template-columns:minmax(0,1fr) 260px}.calendar{min-width:0;background:rgba(255,255,255,.88);border-color:#a9bccb}.days{background:#e8f0f6;border-bottom:2px solid #a9bccb;grid-template-columns:64px repeat(7,minmax(0,1fr))}.dayhead{border-left:1px solid #b7c9d7;padding:12px 6px}.dayhead small{color:#4b6071;font-weight:700}.dayhead span{font-size:15px}
 .timegrid{grid-template-columns:64px repeat(7,minmax(0,1fr));grid-template-rows:repeat(24,30px);background:#f8fbfd;overflow:hidden}.time{color:#41586a;font-size:12px;font-weight:600;background:#e8f0f6;border-top:1px solid #b7c9d7;padding:4px 8px;z-index:3}.slot,.slot.work{border-left:1px solid #9fb6c8;background-color:#f8fbfd;background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 14px,rgba(128,153,172,.18) 14px,rgba(128,153,172,.18) 15px,transparent 15px,transparent 29px,#b7c9d7 29px,#b7c9d7 30px);background-size:auto}.slot:not(.work){background-color:#e5edf3}.slot:hover{background-color:#e7f3ff}.appt{background:#d6eaff;border-left-color:#3177b4;color:#193c58;font-size:12px;box-shadow:0 2px 7px rgba(32,70,100,.16)}.appt strong{font-size:13px}.appt small{color:#31516c}
