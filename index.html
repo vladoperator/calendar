@@ -24,6 +24,118 @@ function clinicTab(tab,b){document.querySelectorAll('.tabline button').forEach(x
 async function downloadPdf(content){let text=content||'Fișă medicală — '+patientName(selectedPatient)+'\n\n'+JSON.stringify(db.records[selectedPatient]||{},null,2);try{let r=await fetch('/export-pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!r.ok)throw 0;let a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='denta-atelier-document.pdf';a.click();toast('Document PDF generat.')}catch{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));a.download='denta-atelier-document.txt';a.click();toast('Serverul de export nu rulează; s-a descărcat textul documentului.')}}
 async function exportVisits(){let rows=db.appointments.map(a=>{let p=db.patients.find(x=>x.id===a.patient);return[patientName(p.id),p.phone,a.start.slice(0,10),'Consultație']});try{let r=await fetch('/export-visits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});if(!r.ok)throw 0;let a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='jurnal-vizite.xlsx';a.click();toast('Jurnalul XLSX a fost exportat.')}catch{let content=[['Pacient','Telefon','Data','Servicii'],...rows].map(r=>r.map(x=>'"'+String(x).replaceAll('"','""')+'"').join(',')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8'}));a.download='jurnal-visite.csv';a.click();toast('Serverul de export nu rulează; s-a descărcat CSV.')}}renderCalendar();renderPatients();
 </script>
+<style>
+  .user-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+  .user-callout{padding:16px;border-radius:17px;background:rgba(255,255,255,.32);border:1px solid rgba(255,255,255,.56)}
+  .user-callout h3{margin:0 0 6px;font:800 16px Manrope}
+  @media(max-width:760px){.user-summary{grid-template-columns:1fr}.record-actions{flex-wrap:wrap}}
+</style>
+<script>
+/* Acțiuni de lucru vizibile pentru fișe medicale și administrarea accesului. */
+(function () {
+  const nav = document.querySelector('.nav');
+  if (nav && !document.querySelector('[data-page="users"]')) {
+    nav.insertAdjacentHTML('beforeend', '<button data-page="users" onclick="show(\'users\')">Utilizatori</button>');
+  }
+
+  const recordsToolbar = document.querySelector('#records .toolbar');
+  if (recordsToolbar && !document.getElementById('newMedicalRecordButton')) {
+    const button = document.createElement('button');
+    button.id = 'newMedicalRecordButton';
+    button.className = 'black';
+    button.type = 'button';
+    button.textContent = '＋ Fișă medicală nouă';
+    button.onclick = () => window.openMedicalRecord();
+    recordsToolbar.insertBefore(button, recordsToolbar.querySelector('.black'));
+  }
+
+  if (!q('users')) {
+    const usersView = document.createElement('section');
+    usersView.id = 'users';
+    usersView.className = 'view';
+    usersView.innerHTML = '<div class="toolbar card"><h1>Utilizatori și cereri de acces</h1><button class="black" onclick="openUserManagement()">Gestionează utilizatorii</button></div><div class="section card" id="usersContent"></div>';
+    q('clinic').before(usersView);
+  }
+
+  window.show = function (id) {
+    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+    const view = document.getElementById(id);
+    if (!view) return;
+    view.classList.add('active');
+    document.querySelectorAll('.nav button').forEach(button => button.classList.toggle('active', button.dataset.page === id));
+    if (id === 'patients') renderPatients();
+    if (id === 'tariffs') renderTariffs();
+    if (id === 'records') renderRecord();
+    if (id === 'clinic') renderClinic();
+    if (id === 'users') window.renderUsers();
+  };
+
+  window.renderUsers = function () {
+    const target = q('usersContent');
+    if (!target) return;
+    target.innerHTML = `<div class="user-summary"><div class="stat"><small>Administrare</small><b>Administrator</b><span class="muted">Aprobă sau respinge cererile</span></div><div class="stat"><small>Acces nou</small><b>În așteptare</b><span class="muted">Verifică lista de cereri</span></div><div class="stat"><small>Acces la date</small><b>Controlat</b><span class="muted">Doar conturile aprobate pot intra</span></div></div><div class="user-callout"><h3>Conturi pentru echipa clinicii</h3><p class="muted">Aici administratorul vede conturile create și aprobă accesul lor la datele clinicii. Un utilizator nou se înregistrează cu emailul și parola proprie, iar contul rămâne în așteptare până la aprobare.</p><div class="row wrap"><button class="black" onclick="openUserManagement()">Vezi și aprobă cererile</button><button class="soft" onclick="showAccessInstructions()">Cum se adaugă un utilizator?</button></div></div>`;
+  };
+
+  window.openMedicalRecord = function () {
+    const options = db.patients.map(p => `<option value="${p.id}">${esc(patientName(p.id))}</option>`).join('');
+    modal(`<h2>Fișă medicală nouă</h2><p class="muted">Alege pacientul pentru care vrei să creezi fișa medicală. Dacă pacientul nu există încă, adaugă-l mai întâi din pagina „Pacienți”.</p><label>Pacient<select id="newRecordPatient" class="field">${options}</select></label><div class="footer-actions"><button class="soft" onclick="closeModal()">Anulează</button><button class="black" onclick="createMedicalRecord()">Creează fișa</button></div>`);
+  };
+
+  window.createMedicalRecord = function () {
+    const patientId = q('newRecordPatient')?.value;
+    if (!patientId) { toast('Adaugă mai întâi un pacient.'); return; }
+    if (!db.records[patientId]) db.records[patientId] = {};
+    selectedPatient = patientId;
+    save();
+    closeModal();
+    show('records');
+    renderRecord();
+    toast('Fișa medicală este pregătită pentru completare.');
+  };
+
+  window.showAccessInstructions = function () {
+    modal(`<h2>Adaugă un utilizator</h2><p class="muted">Utilizatorul își creează contul cu email și parolă pe ecranul de autentificare. După înregistrare, contul apare ca „În așteptare” în lista de mai jos.</p><div class="notice">Administratorul deschide apoi „Vezi și aprobă cererile” și apasă <b>Aprobă</b> pentru utilizatorul dorit. Doar după aprobare, utilizatorul poate accesa datele clinicii.</div><div class="footer-actions"><button class="black" onclick="openUserManagement()">Deschide cererile</button></div>`);
+  };
+
+  window.openUserManagement = function () {
+    if (typeof window.manageClinicUsers === 'function') {
+      window.manageClinicUsers();
+      return;
+    }
+    modal(`<h2>Utilizatori clinică</h2><div class="notice">Gestionarea conturilor este disponibilă după conectarea bazei de date Supabase și autentificarea cu un cont de administrator.</div><p class="muted">După conectare, aici vei găsi lista cererilor și butonul „Aprobă” pentru fiecare utilizator nou.</p><div class="footer-actions"><button class="soft" onclick="showDbModal()">Setări conexiune</button><button class="black" onclick="closeModal()">Închide</button></div>`);
+  };
+
+  window.requestClinicAccess = function () {
+    modal(`<h2>Solicită acces la clinică</h2><p class="muted">Creează contul tău. Administratorul clinicii va primi cererea și trebuie să o aprobe înainte să poți intra în aplicație.</p><label>Email<input id="requestEmail" class="field" type="email" autocomplete="email"></label><label>Parolă<input id="requestPassword" class="field" type="password" autocomplete="new-password" minlength="8"></label><div class="footer-actions"><button class="soft" onclick="closeModal()">Anulează</button><button class="black" onclick="submitAccessRequest()">Trimite cererea</button></div>`);
+  };
+
+  window.submitAccessRequest = async function () {
+    const email = q('requestEmail').value.trim();
+    const password = q('requestPassword').value;
+    if (!email || password.length < 8) { toast('Introdu un email valid și o parolă de cel puțin 8 caractere.'); return; }
+    const cloud = window.dentaSupabase;
+    if (!cloud?.configured()) { toast('Conectează mai întâi aplicația la Supabase.'); return; }
+    try {
+      await cloud.signUp(email, password);
+      await cloud.signOut();
+      closeModal();
+      toast('Cererea a fost trimisă. Așteaptă aprobarea administratorului.');
+    } catch (error) {
+      console.error('Cerere acces:', error);
+      toast('Cererea nu a putut fi trimisă. Verifică emailul sau încearcă din nou.');
+    }
+  };
+
+  function addAccessRequestButton() {
+    const actions = document.querySelector('#authGate .footer-actions');
+    if (actions && !document.getElementById('accessRequestButton')) {
+      actions.insertAdjacentHTML('afterbegin', '<button id="accessRequestButton" class="soft" type="button" onclick="requestClinicAccess()">Solicită acces</button>');
+    }
+  }
+  new MutationObserver(addAccessRequestButton).observe(document.body, { childList: true, subtree: true });
+  addAccessRequestButton();
+})();
+</script>
 <script src="supabase-config.js"></script>
 <script src="supabase-client.js"></script>
 </body></html>
