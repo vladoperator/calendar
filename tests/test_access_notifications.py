@@ -29,6 +29,7 @@ class FakeHandler:
 class RegistrationNotificationTests(unittest.TestCase):
     def setUp(self):
         self.env = patch.dict(os.environ, {
+            "REGISTRATION_EMAIL_PROVIDER": "resend",
             "ACCESS_REQUEST_WEBHOOK_SECRET": SECRET,
             "RESEND_API_KEY": "test-api-key",
             "REGISTRATION_EMAIL_FROM": "Denta Atelier <requests@example.test>",
@@ -61,6 +62,39 @@ class RegistrationNotificationTests(unittest.TestCase):
         self.assertNotIn("never-send-this", message["text"])
         self.assertNotIn("test-api-key", message["text"])
         self.assertEqual(request.get_header("Idempotency-key"), f"clinic-access/{USER_ID}")
+
+    @patch("access_notifications.urllib.request.urlopen")
+    def test_brevo_uses_its_api_and_keeps_the_approval_recipient(self, send):
+        send.return_value.__enter__.return_value = io.BytesIO(b'{"messageId":"brevo-test-id"}')
+        with patch.dict(os.environ, {"REGISTRATION_EMAIL_PROVIDER": "brevo", "BREVO_API_KEY": "test-brevo-key"}):
+            handler = FakeHandler(self.event)
+            handle_access_request(handler)
+        self.assertEqual(handler.result, (200, {"sent": True}))
+        request = send.call_args.args[0]
+        message = json.loads(request.data)
+        self.assertEqual(request.full_url, "https://api.brevo.com/v3/smtp/email")
+        self.assertEqual(request.get_header("Api-key"), "test-brevo-key")
+        self.assertEqual(message["to"], [{"email": "chathot000@gmail.com"}])
+        self.assertEqual(message["sender"]["email"], "requests@example.test")
+        self.assertIn("new.user@example.test", message["textContent"])
+        self.assertNotIn("test-brevo-key", message["textContent"])
+
+    @patch("access_notifications.urllib.request.urlopen")
+    def test_brevo_configuration_and_provider_response_are_checked(self, send):
+        with patch.dict(os.environ, {"REGISTRATION_EMAIL_PROVIDER": "brevo", "BREVO_API_KEY": ""}):
+            handler = FakeHandler(self.event)
+            handle_access_request(handler)
+            self.assertEqual(handler.result[0], 503)
+        with patch.dict(os.environ, {"REGISTRATION_EMAIL_PROVIDER": "brevo", "BREVO_API_KEY": "test-key", "REGISTRATION_EMAIL_FROM": "invalid"}):
+            handler = FakeHandler(self.event)
+            handle_access_request(handler)
+            self.assertEqual(handler.result[0], 503)
+        send.assert_not_called()
+        send.return_value.__enter__.return_value = io.BytesIO(b'{"id":"wrong-provider-response"}')
+        with patch.dict(os.environ, {"REGISTRATION_EMAIL_PROVIDER": "brevo", "BREVO_API_KEY": "test-key"}):
+            handler = FakeHandler(self.event)
+            handle_access_request(handler)
+            self.assertEqual(handler.result[0], 502)
 
     @patch("access_notifications.urllib.request.urlopen")
     def test_approved_accounts_and_unrelated_events_do_not_notify(self, send):
