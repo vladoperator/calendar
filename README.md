@@ -51,7 +51,7 @@ Pentru detalii complete despre găzduirea gratuită sau cloud (Render, Railway, 
 Aplicația este configurată pentru proiectul Supabase primit. Pentru a activa salvarea reală în cloud:
 
 1. În Supabase, deschide **SQL Editor** → **New query**.
-2. Rulează, în ordine, toate migrările din `supabase/migrations/`, inclusiv `004_registration_approval.sql`. Dacă primele trei sunt deja aplicate, rulează doar `004`.
+2. Rulează, în ordine, migrările pentru date și acces `001`–`004` din `supabase/migrations/`. Pentru notificări email, configurează Vault și aplică și `005_access_request_notifications.sql`, conform ghidului de publicare. La o instalare existentă, aplică doar migrările care lipsesc.
 3. În setările **Authentication**, activează providerul Email și **Allow new users to sign up**. Păstrează **Confirm email** activ și configurează URL-ul de redirect al site-ului. Configurează și SMTP pentru mesajele de confirmare Supabase în producție.
 4. Înregistrează și confirmă contul `chathot000@gmail.com`. Migrarea `004` îi acordă rolul de administrator numai după confirmarea adresei. Administratorii existenți își păstrează accesul.
 5. Pe ecranul de pornire, apasă **Înregistrare / Register**. Conturile noi rămân în așteptare până la aprobarea din **Utilizatori → Vezi și aprobă cererile**. Confirmarea emailului nu aprobă accesul la datele clinicii.

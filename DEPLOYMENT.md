@@ -88,12 +88,10 @@ Destinatarul notificărilor este fix: **chathot000@gmail.com**. Emailul include 
    - `REGISTRATION_EMAIL_FROM`: expeditorul verificat în providerul ales, de exemplu `Denta Atelier <requests@domeniul-tau.md>`.
    - `ACCESS_REQUEST_WEBHOOK_SECRET`: un secret aleatoriu de minimum 32 de caractere, generat cu `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`.
 3. Publică versiunea actualizată a proiectului. Endpointul `POST /api/access-request` este disponibil în Vercel și în serverul Python. Valorile nu se pun în `supabase-config.js` sau în Git. Serverul Python citește variabilele mediului; nu încarcă automat fișiere `.env`.
-4. În [Supabase Database Webhooks](https://supabase.com/docs/guides/database/webhooks), creează un webhook pe tabelul **public.clinic_users**, numai pentru evenimentul **INSERT**:
-   - Method: **POST**.
-   - URL: adresa HTTPS publică a aplicației, urmată de `/api/access-request`.
-   - Header `Content-Type`: `application/json`.
-   - Header `Authorization`: `Bearer ` urmat de aceeași valoare `ACCESS_REQUEST_WEBHOOK_SECRET`.
-   - Timeout: **10000 ms**.
+4. În [Supabase Vault](https://supabase.com/docs/guides/database/vault), adaugă două valori:
+   - `denta_access_request_url`: adresa HTTPS publică a aplicației urmată de `/api/access-request`.
+   - `denta_access_request_token`: aceeași valoare ca `ACCESS_REQUEST_WEBHOOK_SECRET` din Vercel.
+   Apoi aplică [`005_access_request_notifications.sql`](supabase/migrations/005_access_request_notifications.sql) în SQL Editor. Migrarea folosește [pg_net](https://supabase.com/docs/guides/database/extensions/pg_net) pentru un apel asincron numai la inserarea conturilor neaprobate în `public.clinic_users`. Tokenul rămâne în Vault, iar migrarea nu conține secrete. Nu configura simultan un al doilea webhook pentru același eveniment, deoarece ar trimite emailuri duplicate.
 5. Verifică folosind un cont de test cu o adresă pe care o controlezi: înregistrare → confirmare email → autentificare blocată până la aprobare → cerere vizibilă în Utilizatori → notificare primită la chathot000@gmail.com → aprobare → autentificare reușită.
 
 Nu alege `auth.users` pentru webhook: acel tabel conține câmpuri de autentificare care nu sunt necesare notificărilor. Endpointul acceptă numai evenimente pentru `public.clinic_users` și cere secretul serverului. Pentru Resend, reîncercările aceleiași cereri folosesc cheia de idempotency bazată pe ID-ul contului. Pentru Brevo, verifică jurnalul de livrare înainte de retrimitere, deoarece aceasta poate produce o notificare duplicată.
