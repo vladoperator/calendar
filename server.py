@@ -6,6 +6,7 @@ import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import database
+from access_notifications import handle_access_request
 
 try:
     from openpyxl import Workbook
@@ -75,6 +76,9 @@ class Handler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        if urllib.parse.urlparse(self.path).path == "/api/access-request":
+            handle_access_request(self)
+            return
         length = int(self.headers.get("Content-Length", 0))
         raw_body = self.rfile.read(length) if length > 0 else b"{}"
         try:

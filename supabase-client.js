@@ -23,7 +23,12 @@
     });
     if (!response.ok) {
       const detail = await response.text();
-      throw new Error(detail || `Supabase a răspuns cu ${response.status}.`);
+      let data = {};
+      try { data = JSON.parse(detail); } catch (_) {}
+      const error = new Error(data.msg || data.message || `Supabase a răspuns cu ${response.status}.`);
+      error.code = data.error_code || data.code;
+      error.status = response.status;
+      throw error;
     }
     return response.status === 204 ? null : response.json();
   }

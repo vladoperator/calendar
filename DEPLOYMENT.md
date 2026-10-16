@@ -69,13 +69,35 @@ Pentru o bază de date **PostgreSQL** online, ai următoarele opțiuni excelente
 
 Această versiune folosește direct API-ul Supabase din browser, cu autentificare pe email și politici RLS. Nu este nevoie de `DATABASE_URL` sau de cheia `service_role`.
 
-1. Rulează, în ordine, migrarea [`001_clinic_state.sql`](supabase/migrations/001_clinic_state.sql), [`002_team_access.sql`](supabase/migrations/002_team_access.sql) și [`003_single_admin_access.sql`](supabase/migrations/003_single_admin_access.sql) în SQL Editor-ul Supabase.
+1. Rulează, în ordine, migrările [`001_clinic_state.sql`](supabase/migrations/001_clinic_state.sql), [`002_team_access.sql`](supabase/migrations/002_team_access.sql), [`003_single_admin_access.sql`](supabase/migrations/003_single_admin_access.sql) și [`004_registration_approval.sql`](supabase/migrations/004_registration_approval.sql) în SQL Editor-ul Supabase. Pentru o instalare existentă, aplică doar migrările care nu sunt încă rulate.
 2. În **Authentication → URL Configuration**, adaugă URL-ul final Vercel la **Site URL** și **Redirect URLs**.
-3. În **Authentication → Users**, folosește **Add user** pentru a crea administratorul cu emailul și parola dorite. Primul cont devine automat administrator.
+3. Activează Email, **Allow new users to sign up** și **Confirm email** în setările Authentication. Configurează SMTP pentru confirmările Supabase în producție. Înregistrează și confirmă adresa `chathot000@gmail.com`; migrarea `004` recunoaște această adresă confirmată ca administrator. Administratorii existenți sunt păstrați. Un vizitator nou nu mai devine administrator doar pentru că s-a înregistrat primul.
 4. Publică folderul curent pe Vercel. Fișierele `supabase-config.js` și `supabase-client.js` sunt servite automat împreună cu site-ul.
-5. Această configurare este pentru un singur administrator: pagina de autentificare apare înainte de calendar, nu există opțiune de creare cont în site, iar utilizatorii care nu sunt administratori nu pot citi sau modifica datele.
+5. Pagina de autentificare apare înainte de calendar și include **Înregistrare / Register**. Utilizatorii noi confirmă emailul și așteaptă aprobarea administratorului. Numai administratorii pot aproba conturi din **Utilizatori → Vezi și aprobă cererile**.
 
-Tabelul `clinic_state` păstrează starea completă a clinicii într-un document JSON comun. Politicile Row Level Security permit accesul numai contului administratorului.
+Tabelul `clinic_state` păstrează starea completă a clinicii într-un document JSON comun. Politicile Row Level Security permit citirea și modificarea numai conturilor aprobate. Inițializarea și ștergerea spațiului de lucru sunt rezervate administratorilor.
+
+### Notificări email pentru cereri de acces
+
+Destinatarul notificărilor este fix: **chathot000@gmail.com**. Emailul include adresa solicitantului și instrucțiunile de aprobare; nu include parole, tokenuri sau date medicale. Înregistrarea și aprobarea funcționează și dacă serviciul email este indisponibil.
+
+1. Creează o cheie de trimitere în [Resend](https://resend.com/docs/api-reference/emails/send-email) și verifică domeniul expeditorului. Acest serviciu trimite notificările către administrator; confirmările de cont sunt gestionate separat de Supabase Auth.
+2. În variabilele de mediu **server** ale proiectului Vercel (sau ale serverului Python), adaugă valorile din `.env.example`:
+   - `RESEND_API_KEY`: cheia privată Resend.
+   - `REGISTRATION_EMAIL_FROM`: expeditorul verificat, de exemplu `Denta Atelier <requests@domeniul-tau.md>`.
+   - `ACCESS_REQUEST_WEBHOOK_SECRET`: un secret aleatoriu de minimum 32 de caractere, generat cu `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`.
+3. Publică versiunea actualizată a proiectului. Endpointul `POST /api/access-request` este disponibil în Vercel și în serverul Python. Valorile nu se pun în `supabase-config.js` sau în Git. Serverul Python citește variabilele mediului; nu încarcă automat fișiere `.env`.
+4. În [Supabase Database Webhooks](https://supabase.com/docs/guides/database/webhooks), creează un webhook pe tabelul **public.clinic_users**, numai pentru evenimentul **INSERT**:
+   - Method: **POST**.
+   - URL: adresa HTTPS publică a aplicației, urmată de `/api/access-request`.
+   - Header `Content-Type`: `application/json`.
+   - Header `Authorization`: `Bearer ` urmat de aceeași valoare `ACCESS_REQUEST_WEBHOOK_SECRET`.
+   - Timeout: **10000 ms**.
+5. Verifică folosind un cont de test cu o adresă pe care o controlezi: înregistrare → confirmare email → autentificare blocată până la aprobare → cerere vizibilă în Utilizatori → notificare primită la chathot000@gmail.com → aprobare → autentificare reușită.
+
+Nu alege `auth.users` pentru webhook: acel tabel conține câmpuri de autentificare care nu sunt necesare notificărilor. Endpointul acceptă numai evenimente pentru `public.clinic_users` și cere secretul serverului. Reîncercările aceleiași cereri folosesc cheia de idempotency Resend bazată pe ID-ul contului.
+
+Dacă emailul nu ajunge, verifică istoricul webhookului din schema `net` și jurnalul Resend. Codul `401` indică un secret nepotrivit, `503` o configurare lipsă, iar `502` o problemă de trimitere. Remediază configurația și retrimite evenimentul dintr-un mediu de încredere; webhookul nu promite reîncercări automate. Cererea rămâne disponibilă pentru aprobare în aplicație indiferent de livrarea notificării.
 
 ---
 

@@ -104,36 +104,6 @@ async function exportVisits(){let rows=db.appointments.map(a=>{let p=db.patients
     }
     modal(`<h2>Utilizatori clinică</h2><div class="notice">Gestionarea conturilor este disponibilă după conectarea bazei de date Supabase și autentificarea cu un cont de administrator.</div><p class="muted">După conectare, aici vei găsi lista cererilor și butonul „Aprobă” pentru fiecare utilizator nou.</p><div class="footer-actions"><button class="soft" onclick="showDbModal()">Setări conexiune</button><button class="black" onclick="closeModal()">Închide</button></div>`);
   };
-
-  window.requestClinicAccess = function () {
-    modal(`<h2>Solicită acces la clinică</h2><p class="muted">Creează contul tău. Administratorul clinicii va primi cererea și trebuie să o aprobe înainte să poți intra în aplicație.</p><label>Email<input id="requestEmail" class="field" type="email" autocomplete="email"></label><label>Parolă<input id="requestPassword" class="field" type="password" autocomplete="new-password" minlength="8"></label><div class="footer-actions"><button class="soft" onclick="closeModal()">Anulează</button><button class="black" onclick="submitAccessRequest()">Trimite cererea</button></div>`);
-  };
-
-  window.submitAccessRequest = async function () {
-    const email = q('requestEmail').value.trim();
-    const password = q('requestPassword').value;
-    if (!email || password.length < 8) { toast('Introdu un email valid și o parolă de cel puțin 8 caractere.'); return; }
-    const cloud = window.dentaSupabase;
-    if (!cloud?.configured()) { toast('Conectează mai întâi aplicația la Supabase.'); return; }
-    try {
-      await cloud.signUp(email, password);
-      await cloud.signOut();
-      closeModal();
-      toast('Cererea a fost trimisă. Așteaptă aprobarea administratorului.');
-    } catch (error) {
-      console.error('Cerere acces:', error);
-      toast('Cererea nu a putut fi trimisă. Verifică emailul sau încearcă din nou.');
-    }
-  };
-
-  function addAccessRequestButton() {
-    const actions = document.querySelector('#authGate .footer-actions');
-    if (actions && !document.getElementById('accessRequestButton')) {
-      actions.insertAdjacentHTML('afterbegin', '<button id="accessRequestButton" class="soft" type="button" onclick="requestClinicAccess()">Solicită acces</button>');
-    }
-  }
-  new MutationObserver(addAccessRequestButton).observe(document.body, { childList: true, subtree: true });
-  addAccessRequestButton();
 })();
 </script>
 <script src="supabase-config.js"></script>
@@ -193,26 +163,31 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
 (function () {
   const cloud = window.dentaSupabase;
   let currentProfile = null;
+  let authBusy = false;
   if (!cloud?.configured()) return;
 
-  function showLoginGate(message = 'Conectează-te cu contul administratorului pentru a accesa clinica.') {
+  function showLoginGate(message = 'Conectează-te sau creează un cont pentru a solicita acces la clinică.', mode = 'signin', email = '') {
+    const registering = mode === 'signup';
     let gate = q('authGate');
     if (!gate) {
       const style = document.createElement('style');
-      style.textContent = '#authGate{position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#e8f3f8,#d9d5ef);display:grid;place-items:center;padding:20px}#authGate .auth-card{width:min(420px,100%);padding:30px;border-radius:26px;background:rgba(255,255,255,.9);box-shadow:0 24px 64px rgba(29,49,71,.25);border:1px solid rgba(255,255,255,.85)}#authGate h1{font:800 26px Manrope;margin:0 0 8px}#authGate p{margin:0 0 16px}';
+      style.textContent = '#authGate{position:fixed;inset:0;z-index:999;overflow-y:auto;background:linear-gradient(135deg,#e8f3f8,#d9d5ef);display:grid;place-items:center;padding:20px}#authGate .auth-card{width:min(420px,100%);padding:30px;border-radius:26px;background:rgba(255,255,255,.9);box-shadow:0 24px 64px rgba(29,49,71,.25);border:1px solid rgba(255,255,255,.85)}#authGate h1{font:800 26px Manrope;margin:0 0 8px}#authGate p{margin:0 0 16px}#authGate .brand{margin-bottom:20px}#authGate label{display:block;margin-top:10px}#authGate .footer-actions{flex-wrap:wrap}#authGate button:disabled{opacity:.6;cursor:wait}#authGateMessage{overflow-wrap:anywhere}#authGateMessage[data-error=true]{color:#a12525}#authGate .auth-help{font-size:12px;margin-top:16px;margin-bottom:0}';
       document.head.appendChild(style);
       gate = document.createElement('div');
       gate.id = 'authGate';
       document.body.appendChild(gate);
     }
-    gate.innerHTML = `<div class="auth-card"><div class="brand"><i>✦</i>Denta Atelier</div><h1>Autentificare</h1><p class="muted" id="authGateMessage"></p><label>Email<input id="gateEmail" class="field" type="email" autocomplete="email" required></label><label>Parolă<input id="gatePassword" class="field" type="password" autocomplete="current-password" required></label><div class="footer-actions"><button class="black" onclick="submitSupabaseAuth('signin',true)">Intră în aplicație</button></div></div>`;
+    gate.innerHTML = `<div class="auth-card"><div class="brand"><i>✦</i>Denta Atelier</div><h1>${registering ? 'Creează un cont' : 'Autentificare'}</h1><p class="muted" id="authGateMessage" role="status" aria-live="polite"></p><form id="authGateForm" onsubmit="submitSupabaseAuth('${mode}',true);return false"><label for="gateEmail">Email</label><input id="gateEmail" class="field" type="email" autocomplete="email" required><label for="gatePassword">Parolă${registering ? ' (minimum 8 caractere)' : ''}</label><input id="gatePassword" class="field" type="password" autocomplete="${registering ? 'new-password' : 'current-password'}" ${registering ? 'minlength="8"' : ''} required>${registering ? '<label for="gateConfirmPassword">Confirmă parola</label><input id="gateConfirmPassword" class="field" type="password" autocomplete="new-password" minlength="8" required oninput="this.setCustomValidity(\'\')">' : ''}<div class="footer-actions"><button class="soft" type="button" onclick="${registering ? 'showSupabaseLogin()' : 'requestClinicAccess()'}">${registering ? 'Înapoi la autentificare' : 'Înregistrare / Register'}</button><button class="black" id="authSubmit" type="submit">${registering ? 'Creează cont și solicită acces' : 'Intră în aplicație'}</button></div></form>${registering ? '<p class="muted auth-help">Accesul necesită aprobarea administratorului. Cererile sunt destinate chathot000@gmail.com.</p>' : ''}</div>`;
     q('authGateMessage').textContent = message;
+    q('gateEmail').value = email;
+    document.querySelector('.app').hidden = true;
     gate.style.display = 'grid';
   }
 
   function hideLoginGate() {
     const gate = q('authGate');
     if (gate) gate.style.display = 'none';
+    document.querySelector('.app').hidden = false;
   }
 
   function cloudUserLabel() {
@@ -223,19 +198,24 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
     updateDbBadge('syncing', 'Conectare Supabase...');
     try {
       currentProfile = await cloud.getProfile();
-      if (!currentProfile?.approved || currentProfile.role !== 'admin') {
+      if (!currentProfile?.approved) {
         await cloud.signOut();
         currentProfile = null;
         updateDbBadge('offline', 'Acces restricționat');
-        showLoginGate('Acest cont nu are acces. Aplicația este rezervată administratorului clinicii.');
+        showLoginGate('Contul tău așteaptă aprobarea administratorului. După aprobare, te poți autentifica.');
         return false;
       }
       const remote = await cloud.loadState();
       if (remote?.clinic && Array.isArray(remote.patients)) {
         db = remote;
         localStorage.setItem('dentaAtelierDB', JSON.stringify(db));
-      } else {
+      } else if (currentProfile.role === 'admin') {
         await cloud.saveState(db);
+      } else {
+        await cloud.signOut();
+        currentProfile = null;
+        showLoginGate('Administratorul trebuie să inițializeze datele clinicii înainte de prima conectare.');
+        return false;
       }
       updateDbBadge('connected', 'Supabase conectat');
       hideLoginGate();
@@ -244,7 +224,7 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
     } catch (error) {
       console.error('Supabase:', error);
       updateDbBadge('offline', 'Configurare DB necesară');
-      toast('Supabase nu este pregătit. Rulează migrarea SQL din proiect.');
+      showLoginGate('Datele clinicii nu au putut fi încărcate. Verifică conexiunea și încearcă din nou.');
       return false;
     }
   }
@@ -268,35 +248,81 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
   };
 
   window.showSupabaseLogin = function () {
+    if (authBusy) return;
+    const email = q('gateEmail')?.value.trim() || '';
     closeModal();
-    showLoginGate();
+    showLoginGate(undefined, 'signin', email);
   };
 
-  window.submitSupabaseAuth = async function (action, fromGate = false) {
-    const email = q(fromGate ? 'gateEmail' : 'sbEmail').value.trim();
-    const password = q(fromGate ? 'gatePassword' : 'sbPassword').value;
-    if (!email || password.length < 8) {
-      toast('Introdu un email valid și o parolă de cel puțin 8 caractere.');
-      return;
-    }
+  window.requestClinicAccess = function () {
+    if (authBusy) return;
+    const email = q('gateEmail')?.value.trim() || '';
+    closeModal();
+    showLoginGate('Creează contul cu emailul și parola ta. Accesul la clinică se activează după aprobarea administratorului.', 'signup', email);
+  };
+
+  window.submitAccessRequest = function () { return window.submitSupabaseAuth('signup', true); };
+
+  window.submitSupabaseAuth = async function (action) {
+    if (authBusy) return;
+    const form = q('authGateForm');
+    const registering = action === 'signup';
+    const email = q('gateEmail').value.trim();
+    const password = q('gatePassword').value;
+    const confirmation = q('gateConfirmPassword');
+    if (confirmation) confirmation.setCustomValidity(password === confirmation.value ? '' : 'Parolele introduse nu coincid.');
+    if (!form.reportValidity()) return;
+    authBusy = true;
+    form.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    q('authSubmit').textContent = registering ? 'Se creează contul…' : 'Se conectează…';
+    q('authGateMessage').textContent = '';
+    q('authGateMessage').dataset.error = 'false';
     try {
+      if (registering) {
+        const result = await cloud.signUp(email, password);
+        const needsConfirmation = !result?.access_token;
+        await cloud.signOut();
+        currentProfile = null;
+        showLoginGate(needsConfirmation
+          ? 'Verifică emailul pentru confirmarea contului. Dacă ai deja un cont, autentifică-te. Accesul la clinică necesită aprobarea administratorului.'
+          : 'Contul a fost creat. Cererea de acces așteaptă aprobarea administratorului. Te poți autentifica după aprobare.', 'signin', email);
+        return;
+      }
       await cloud.signIn(email, password);
       closeModal();
       const loaded = await loadFromSupabase();
       if (loaded) toast('Conectat: ' + cloudUserLabel());
     } catch (error) {
       console.error('Autentificare Supabase:', error);
-      toast('Conectarea a eșuat. Verifică emailul și parola.');
+      const messages = {
+        email_not_confirmed: 'Confirmă adresa de email folosind linkul primit înainte să te conectezi.',
+        signup_disabled: 'Înregistrarea este dezactivată. Contactează administratorul clinicii.',
+        user_already_exists: 'Există deja un cont cu acest email. Revino la autentificare.',
+        over_email_send_rate_limit: 'Au fost solicitate prea multe emailuri. Așteaptă câteva minute și încearcă din nou.',
+        over_request_rate_limit: 'Prea multe încercări. Așteaptă câteva minute și încearcă din nou.',
+        weak_password: 'Alege o parolă mai puternică, de minimum 8 caractere.',
+        email_address_invalid: 'Introdu o adresă de email validă.'
+      };
+      q('authGateMessage').textContent = messages[error.code] || (registering
+        ? 'Contul nu a putut fi creat. Verifică emailul și conexiunea, apoi încearcă din nou.'
+        : 'Conectarea a eșuat. Verifică emailul, parola și conexiunea.');
+      q('authGateMessage').dataset.error = 'true';
+    } finally {
+      authBusy = false;
+      form.querySelectorAll('button').forEach(button => { button.disabled = false; });
+      const submit = form.querySelector('#authSubmit');
+      submit.textContent = registering ? 'Creează cont și solicită acces' : 'Intră în aplicație';
     }
   };
 
   showDbModal = function () {
     const connected = dbBadgeState === 'connected';
     const signedIn = Boolean(cloud.session);
-    modal(`<h2>☁️ Baza de date Supabase</h2><div class="stat" style="margin-bottom:14px"><small>Stare conexiune</small><b style="color:${connected ? '#166534' : '#b45309'}">${connected ? '● Supabase activ' : '○ Neconectat'}</b><span class="muted" style="font-size:12px;margin-top:6px;display:block">${signedIn ? 'Cont administrator: ' + esc(cloudUserLabel()) : 'Conectează-te cu contul administratorului.'}</span></div><div class="row wrap" style="gap:10px;margin-bottom:18px"><button class="soft" onclick="downloadBackup()">📥 Backup JSON</button><button class="soft" onclick="loadFromSupabase();closeModal()" ${currentProfile?.role === 'admin' ? '' : 'disabled'}>🔄 Reîncarcă</button>${signedIn ? '<button class="soft" onclick="logoutSupabase()">Deconectare</button>' : '<button class="black" onclick="showSupabaseLogin()">Conectare</button>'}</div><div class="notice">Accesul este rezervat exclusiv administratorului clinicii.</div><div class="footer-actions"><button class="black" onclick="closeModal()">Închide</button></div>`);
+    modal(`<h2>☁️ Baza de date Supabase</h2><div class="stat" style="margin-bottom:14px"><small>Stare conexiune</small><b style="color:${connected ? '#166534' : '#b45309'}">${connected ? '● Supabase activ' : '○ Neconectat'}</b><span class="muted" style="font-size:12px;margin-top:6px;display:block">${signedIn ? 'Cont: ' + esc(cloudUserLabel()) : 'Conectează-te cu un cont aprobat.'}</span></div><div class="row wrap" style="gap:10px;margin-bottom:18px"><button class="soft" onclick="downloadBackup()">📥 Backup JSON</button><button class="soft" onclick="loadFromSupabase();closeModal()" ${currentProfile?.approved ? '' : 'disabled'}>🔄 Reîncarcă</button>${signedIn ? '<button class="soft" onclick="logoutSupabase()">Deconectare</button>' : '<button class="black" onclick="showSupabaseLogin()">Conectare</button>'}</div><div class="notice">Accesul este disponibil numai conturilor aprobate de administrator.</div><div class="footer-actions"><button class="black" onclick="closeModal()">Închide</button></div>`);
   };
 
   window.manageClinicUsers = async function () {
+    if (currentProfile?.role !== 'admin') { toast('Doar administratorul poate gestiona cererile.'); return; }
     try {
       const users = await cloud.listUsers();
       const rows = users.map(user => `<tr><td>${esc(user.email)}</td><td>${user.role === 'admin' ? 'Administrator' : 'Membru'}</td><td>${user.approved ? '<span class="tag">Aprobat</span>' : '<span class="muted">În așteptare</span>'}</td><td>${!user.approved ? `<button class="black" onclick="approveClinicUser('${user.id}')">Aprobă</button>` : ''}</td></tr>`).join('');
@@ -308,6 +334,7 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
   };
 
   window.approveClinicUser = async function (userId) {
+    if (currentProfile?.role !== 'admin') return;
     try {
       await cloud.approveUser(userId);
       toast('Cont aprobat.');
@@ -328,7 +355,7 @@ body{background:#b9d5e7;background-image:radial-gradient(circle at 12% 6%,rgba(2
   };
 
   window.changePassword = function (invitation = false) {
-    modal(`<h2>${invitation ? 'Alege parola administratorului' : 'Schimbă parola'}</h2><p class="muted">Parola trebuie să aibă minimum 8 caractere.</p><label>Parolă nouă<input id="newPwd" class="field" type="password" autocomplete="new-password" minlength="8"></label><label>Confirmă parola<input id="confirmPwd" class="field" type="password" autocomplete="new-password" minlength="8"></label><div class="footer-actions">${invitation ? '' : '<button class="soft" onclick="closeModal()">Anulează</button>'}<button class="black" onclick="finishPasswordChange()">Salvează parola</button></div>`);
+    modal(`<h2>${invitation ? 'Alege parola contului' : 'Schimbă parola'}</h2><p class="muted">Parola trebuie să aibă minimum 8 caractere.</p><label>Parolă nouă<input id="newPwd" class="field" type="password" autocomplete="new-password" minlength="8"></label><label>Confirmă parola<input id="confirmPwd" class="field" type="password" autocomplete="new-password" minlength="8"></label><div class="footer-actions">${invitation ? '' : '<button class="soft" onclick="closeModal()">Anulează</button>'}<button class="black" onclick="finishPasswordChange()">Salvează parola</button></div>`);
   };
 
   window.finishPasswordChange = async function () {
